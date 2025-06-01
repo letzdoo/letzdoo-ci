@@ -1,3 +1,5 @@
+[![ci](https://github.com/letzdoo/letzdoo-ci/actions/workflows/ci.yaml/badge.svg)](https://github.com/letzdoo/letzdoo-ci/actions/workflows/ci.yaml)
+
 # Container image to run OCA CI tests
 
 ⚠️ These images are meant for running CI tests of the Odoo Community
