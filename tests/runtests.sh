@@ -13,4 +13,12 @@ $testvenv/bin/pip install -r $here/requirements.txt
 
 export PATH=$here/../bin:$PATH
 
+# Install enterprise addons and dependencies
+if [ -f "enterprise_install_addons" ]; then
+    echo "Executing enterprise_install_addons..."
+    enterprise_install_addons
+else
+    echo "enterprise_install_addons not found, skipping."
+fi
+
 $testvenv/bin/pytest --color=yes --ignore $here/data $here "$@"
