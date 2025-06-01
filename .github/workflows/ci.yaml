@@ -91,7 +91,7 @@ jobs:
       - name: Install SSH client
         run: sudo apt-get update && sudo apt-get install -y openssh-client git
       - name: Setup SSH for Enterprise Repo
-        if: matrix.odoo_enterprise_repo_url != '' && secrets.ODOO_ENTERPRISE_SSH_PRIVATE_KEY != ''
+        if: matrix.odoo_enterprise_repo_url != ''
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.ODOO_ENTERPRISE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
@@ -110,10 +110,10 @@ jobs:
           #   StrictHostKeyChecking no
           # EOF
       - name: Checkout Odoo Enterprise
-        if: matrix.odoo_enterprise_repo_url != '' && secrets.ODOO_ENTERPRISE_SSH_PRIVATE_KEY != ''
+        if: matrix.odoo_enterprise_repo_url != ''
         run: git clone --depth 1 --branch ${{ matrix.odoo_enterprise_version }} ${{ matrix.odoo_enterprise_repo_url }} ${{ github.workspace }}/odoo-enterprise
       - name: Set Enterprise Docker Args
-        if: matrix.odoo_enterprise_repo_url != '' && secrets.ODOO_ENTERPRISE_SSH_PRIVATE_KEY != ''
+        if: matrix.odoo_enterprise_repo_url != ''
         run: echo 'ENTERPRISE_ARGS=-v ${{ github.workspace }}/odoo-enterprise:/opt/odoo-enterprise -e ADDONS_PATH="/opt/odoo-enterprise:/opt/odoo/addons"' >> $GITHUB_ENV
       - name: Tests
         env:
