@@ -107,6 +107,8 @@ RUN python$python_version -m venv /opt/odoo-venv \
 ENV PATH=/opt/odoo-venv/bin:$PATH
 
 ARG odoo_version
+ARG odoo_enterprise_repo_url
+ARG odoo_enterprise_version
 
 # Install Odoo requirements (use ADD for correct layer caching).
 # We use requirements from OCB for easier maintenance of older versions.
