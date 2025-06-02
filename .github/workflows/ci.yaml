@@ -92,25 +92,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Install SSH client
         run: sudo apt-get update && sudo apt-get install -y openssh-client git
-      - name: Setup SSH for Enterprise Repo
-        if: matrix.odoo_enterprise_repo_url != ''
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.ODOO_ENTERPRISE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
-          # Add other enterprise repo hosts if not github.com
-          # Example for a different host: ssh-keyscan -H your.enterprise.githost.com >> ~/.ssh/known_hosts
-          cat > ~/.ssh/config << 'EOF'
-          Host github.com
-            StrictHostKeyChecking no
-          EOF
-          # If using a different git host for enterprise, configure it here too.
-          # Example:
-          # cat >> ~/.ssh/config << 'EOF'
-          # Host your.enterprise.githost.com
-          #   StrictHostKeyChecking no
-          # EOF
       - name: Tests
         run: docker run -v ${PWD}/tests:/mnt/tests --network=host -e PGHOST=localhost ghcr.io/letzdoo/letzdoo-ci/${{ matrix.image_name }}:latest /mnt/tests/runtests.sh -v
         # Don't bother with Odoo 8 and 9 for now...
