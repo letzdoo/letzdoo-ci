@@ -62,14 +62,15 @@ Integration is controlled by GitHub Actions matrix variables and a repository se
 
 ### How it Works
 
-When `odoo_enterprise_repo_url` and `odoo_enterprise_version` are defined in the CI matrix, and the `ODOO_ENTERPRISE_SSH_PRIVATE_KEY` secret is available, the workflow performs the following steps before running the tests:
+When `odoo_enterprise_repo_url` (matrix variable) is defined in the CI matrix and the `ODOO_ENTERPRISE_SSH_PRIVATE_KEY` secret is available, the workflow enables the use of Odoo Enterprise modules as follows:
 
-1.  **SSH Setup**: The runner's SSH environment is configured using the provided private key to allow access to your enterprise repository.
-2.  **Enterprise Code Checkout**: The specified version of your Odoo Enterprise code is checked out from `odoo_enterprise_repo_url` into a directory (e.g., `odoo-enterprise`) in the GitHub Actions runner's workspace.
-3.  **Volume Mounting**: When the Docker container for tests is started, this directory containing the enterprise code is mounted as a volume into `/opt/odoo-enterprise` inside the container.
-4.  **Addons Path Update**: The `ADDONS_PATH` environment variable within the container is automatically prepended with `/opt/odoo-enterprise`, ensuring that Odoo can discover and load these enterprise modules.
+1.  **SSH Setup (CI Runner)**: The GitHub Actions workflow runner's SSH environment is configured using the provided `ODOO_ENTERPRISE_SSH_PRIVATE_KEY`. This key is made available to the Docker container by mounting the runner's `~/.ssh` directory.
+2.  **Enterprise Setup (Inside Container)**: The `enterprise_install_addons` script, executed as part of `tests/runtests.sh` inside the Docker container, performs the following:
+    *   **Enterprise Code Checkout**: It clones the Odoo Enterprise repository from `odoo_enterprise_repo_url` (using the branch specified by `odoo_enterprise_version`) into the `/opt/odoo-enterprise` directory within the container.
+    *   **Dependency Installation**: It then installs any necessary Python and system dependencies for these enterprise modules.
+3.  **Addons Path Update**: The `ADDONS_PATH` environment variable within the container is automatically prepended with `/opt/odoo-enterprise` by Odoo's standard mechanisms if this path contains addons, ensuring that Odoo can discover and load these enterprise modules. (This part is standard Odoo behavior once the addons are present).
 
-If `odoo_enterprise_repo_url` is not provided, is empty, or the `ODOO_ENTERPRISE_SSH_PRIVATE_KEY` secret is missing, these steps are skipped, and the tests will run using only the standard Odoo addons from the base image.
+If `odoo_enterprise_repo_url` is not provided, is empty, or the `ODOO_ENTERPRISE_SSH_PRIVATE_KEY` secret is missing, the SSH setup might be skipped or fail, and the `enterprise_install_addons` script will not attempt to clone the enterprise repository. Tests will then run using only the standard Odoo addons.
 
 ### Example Workflow Configuration
 
@@ -158,6 +159,11 @@ Available commands:
   tracked branch has evolved.
 - `oca_export_and_push_pot` combines the two previous commands.
 - `oca_checklog_odoo` checks odoo logs for errors (including warnings)
+### `enterprise_install_addons`
+This script is automatically called by `tests/runtests.sh` during the test execution phase. It is responsible for setting up Odoo Enterprise modules if configured. Its main functions are:
+1.  **Cloning Enterprise Repository**: It checks for the `ODOO_ENTERPRISE_REPO_URL` environment variable. If set, it uses this URL and `ODOO_ENTERPRISE_VERSION` to clone the enterprise repository into `/opt/odoo-enterprise` within the Docker container. This requires `git`, `openssh-client`, and a valid SSH private key (configured via the `ODOO_ENTERPRISE_SSH_PRIVATE_KEY` secret) to be available.
+2.  **Dependency Installation**: After successfully cloning the repository, it installs Python and system dependencies for the enterprise addons found in `/opt/odoo-enterprise`.
+If `ODOO_ENTERPRISE_REPO_URL` is not set, the script will skip these steps.
 
 
 ## Build

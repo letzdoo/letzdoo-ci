@@ -93,7 +93,7 @@ jobs:
       - name: Install SSH client
         run: sudo apt-get update && sudo apt-get install -y openssh-client git
       - name: Tests
-        run: docker run -v ${PWD}/tests:/mnt/tests --network=host -e PGHOST=localhost ghcr.io/letzdoo/letzdoo-ci/${{ matrix.image_name }}:latest /mnt/tests/runtests.sh -v
+        run: docker run -v ${HOME}/.ssh:/root/.ssh:ro -v ${PWD}/tests:/mnt/tests -v ${PWD}/bin:/mnt/bin --network=host -e PGHOST=localhost ghcr.io/letzdoo/letzdoo-ci/${{ matrix.image_name }}:latest /mnt/tests/runtests.sh -v
         # Don't bother with Odoo 8 and 9 for now...
         if: ${{ matrix.odoo_version != '8.0' && matrix.odoo_version != '9.0' }}
       - name: Push image

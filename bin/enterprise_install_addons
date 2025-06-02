@@ -1,0 +1,166 @@
+#!/bin/bash
+set -ex
+
+ENTERPRISE_DIR="/opt/odoo-enterprise"
+
+# Check Environment Variables for Cloning
+if [ -z "${ODOO_ENTERPRISE_REPO_URL}" ]; then
+    echo "ODOO_ENTERPRISE_REPO_URL is not set. Skipping enterprise setup."
+    exit 0
+fi
+
+echo "ODOO_ENTERPRISE_REPO_URL is set to: ${ODOO_ENTERPRISE_REPO_URL}"
+if [ -n "${ODOO_ENTERPRISE_VERSION}" ]; then
+    echo "ODOO_ENTERPRISE_VERSION is set to: ${ODOO_ENTERPRISE_VERSION}"
+else
+    echo "ODOO_ENTERPRISE_VERSION is not set. Will attempt to clone default branch."
+fi
+
+# Ensure Prerequisites for Cloning
+if ! command -v git &> /dev/null; then
+    echo "Error: git command not found. Git is required to clone the enterprise repository."
+    exit 1
+fi
+echo "Git is installed."
+
+if ! command -v ssh &> /dev/null; then
+    echo "Error: ssh command not found. OpenSSH client is required to clone the enterprise repository via SSH."
+    exit 1
+fi
+echo "SSH client is installed."
+
+if [ ! -f ~/.ssh/id_rsa ]; then
+    echo "Error: SSH private key not found at ~/.ssh/id_rsa."
+    echo "Please ensure ODOO_ENTERPRISE_SSH_PRIVATE_KEY secret is configured in CI and accessible."
+    exit 1
+fi
+echo "SSH private key found."
+
+# Clone the Enterprise Repository
+if [ -d "${ENTERPRISE_DIR}" ]; then
+    echo "Enterprise directory ${ENTERPRISE_DIR} already exists. Removing it for a clean clone."
+    rm -rf "${ENTERPRISE_DIR}"
+fi
+
+echo "Creating enterprise directory: ${ENTERPRISE_DIR}"
+mkdir -p "${ENTERPRISE_DIR}"
+
+CLONE_CMD="git clone --depth 1"
+if [ -n "${ODOO_ENTERPRISE_VERSION}" ]; then
+    CLONE_CMD="${CLONE_CMD} --branch \"${ODOO_ENTERPRISE_VERSION}\""
+fi
+CLONE_CMD="${CLONE_CMD} \"${ODOO_ENTERPRISE_REPO_URL}\" \"${ENTERPRISE_DIR}\""
+
+echo "Cloning enterprise repository with command: ${CLONE_CMD}"
+if ! eval "${CLONE_CMD}"; then
+    echo "Error: Failed to clone enterprise repository from ${ODOO_ENTERPRISE_REPO_URL}."
+    exit 1
+fi
+echo "Enterprise repository cloned successfully into ${ENTERPRISE_DIR}."
+
+# --- Existing Dependency Installation Logic ---
+
+if [ ! -d "${ENTERPRISE_DIR}" ]; then
+    echo "Enterprise directory ${ENTERPRISE_DIR} not found after clone attempt. This should not happen. Exiting."
+    exit 1 # Should have been created by the clone
+fi
+
+echo "Enterprise directory ${ENTERPRISE_DIR} found. Proceeding with dependency installation."
+
+# Python Dependencies
+echo "Installing Python dependencies for enterprise addons..."
+TEMP_ENTERPRISE_REQ_FILE=$(mktemp)
+TEMP_ENTERPRISE_CONSTRAINTS_FILE=$(mktemp)
+
+# Store original ADDONS_DIR and set to enterprise dir for pyproject-dependencies and oca_list_addons_to_test_as_url_reqs
+ORIGINAL_ADDONS_DIR="${ADDONS_DIR}"
+export ADDONS_DIR="${ENTERPRISE_DIR}" # Set ADDONS_DIR to the enterprise directory
+
+# Check if pyproject-dependencies is available
+if ! command -v pyproject-dependencies &> /dev/null; then
+    echo "pyproject-dependencies command could not be found. Skipping Python dependency resolution."
+else
+    PYPROJECT_FILES=$(find "${ENTERPRISE_DIR}" -maxdepth 2 -name 'pyproject.toml' -print0 | xargs -0r)
+    SETUP_FILES=$(find "${ENTERPRISE_DIR}" -maxdepth 3 -path '*/setup/*/setup.py' -print0 | xargs -0r)
+
+    if [ -n "${PYPROJECT_FILES}" ] || [ -n "${SETUP_FILES}" ]; then
+        echo "Found pyproject.toml or setup.py files. Generating requirements..."
+        # Ensure the command can handle empty file lists if xargs -0r results in nothing
+        CMD_PYPROJECT="env SETUPTOOLS_ODOO_POST_VERSION_STRATEGY_OVERRIDE=none WHOOL_POST_VERSION_STRATEGY_OVERRIDE=none pyproject-dependencies --no-isolation --ignore-build-errors"
+        if [ -n "${PYPROJECT_FILES}" ]; then
+            CMD_PYPROJECT="${CMD_PYPROJECT} ${PYPROJECT_FILES}"
+        fi
+        if [ -n "${SETUP_FILES}" ]; then
+            CMD_PYPROJECT="${CMD_PYPROJECT} ${SETUP_FILES}"
+        fi
+
+        if ! ${CMD_PYPROJECT} >> "${TEMP_ENTERPRISE_REQ_FILE}"; then
+            echo "Warning: pyproject-dependencies command failed. Requirements file might be incomplete."
+        fi
+        cat "${TEMP_ENTERPRISE_REQ_FILE}"
+    else
+        echo "No pyproject.toml or setup.py files found in ${ENTERPRISE_DIR}. Assuming no Python dependencies to install via this method."
+    fi
+fi
+
+# Create constraints file
+echo "Generating constraints file..."
+if command -v oca_list_addons_to_test_as_url_reqs &> /dev/null; then
+    # This command relies on ADDONS_DIR being set to ENTERPRISE_DIR
+    if ! oca_list_addons_to_test_as_url_reqs >> "${TEMP_ENTERPRISE_CONSTRAINTS_FILE}"; then
+         echo "Warning: oca_list_addons_to_test_as_url_reqs failed. Constraints file might be incomplete."
+    fi
+else
+    echo "oca_list_addons_to_test_as_url_reqs command not found. Using empty constraints file."
+fi
+cat "${TEMP_ENTERPRISE_CONSTRAINTS_FILE}"
+
+# Restore original ADDONS_DIR
+export ADDONS_DIR="${ORIGINAL_ADDONS_DIR}"
+
+if [ -s "${TEMP_ENTERPRISE_REQ_FILE}" ]; then
+    echo "Installing pip requirements from ${TEMP_ENTERPRISE_REQ_FILE} with constraints from ${TEMP_ENTERPRISE_CONSTRAINTS_FILE}"
+    if ! pip install -r "${TEMP_ENTERPRISE_REQ_FILE}" -c "${TEMP_ENTERPRISE_CONSTRAINTS_FILE}"; then
+        echo "Warning: pip install command failed for enterprise requirements."
+    fi
+else
+    echo "Enterprise requirements file is empty. Skipping pip install."
+fi
+
+# System Dependencies
+echo "Installing system dependencies for enterprise addons..."
+# Store original ADDONS_DIR again (in case it was changed by user or some other process)
+# and set to enterprise dir for oca_list_external_dependencies
+ORIGINAL_ADDONS_DIR_FOR_SYS_DEPS="${ADDONS_DIR}"
+export ADDONS_DIR="${ENTERPRISE_DIR}" # Set for oca_list_external_dependencies
+
+if ! command -v oca_list_external_dependencies &> /dev/null; then
+    echo "oca_list_external_dependencies command could not be found. Skipping system dependency resolution."
+else
+    DEPS=$(oca_list_external_dependencies deb)
+    if [ -n "$DEPS" ]; then
+        echo "Found system dependencies for enterprise: $DEPS"
+        if ! command -v apt-get &> /dev/null; then
+            echo "apt-get command could not be found. Cannot install system dependencies."
+        else
+            echo "Updating apt-get cache..."
+            apt-get update -qq
+            echo "Installing system dependencies: ${DEPS}"
+            if ! DEBIAN_FRONTEND=noninteractive apt-get install -qq --no-install-recommends ${DEPS}; then
+                echo "Warning: apt-get install command failed for enterprise system dependencies."
+            else
+                echo "System dependencies installed."
+            fi
+        fi
+    else
+        echo "No system dependencies found for enterprise addons."
+    fi
+fi
+
+# Restore original ADDONS_DIR
+export ADDONS_DIR="${ORIGINAL_ADDONS_DIR_FOR_SYS_DEPS}"
+
+# Cleanup temporary files
+rm -f "${TEMP_ENTERPRISE_REQ_FILE}" "${TEMP_ENTERPRISE_CONSTRAINTS_FILE}"
+
+echo "Enterprise dependency installation script finished."
