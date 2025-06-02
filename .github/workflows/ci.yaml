@@ -78,6 +78,8 @@ jobs:
             codename=${{ matrix.codename }}
             python_version=${{ matrix.python_version }}
             odoo_version=${{ matrix.odoo_version }}
+            odoo_enterprise_repo_url=${{ matrix.odoo_enterprise_repo_url }}
+            odoo_enterprise_version=${{ matrix.odoo_enterprise_version }}
             odoo_org_repo=${{ matrix.odoo_org_repo }}
             setuptools_constraint=${{ matrix.setuptools_constraint }}
             odoo_config_setting=${{ matrix.odoo_config_setting }}
@@ -103,6 +105,8 @@ jobs:
             codename=${{ matrix.codename }}
             python_version=${{ matrix.python_version }}
             odoo_version=${{ matrix.odoo_version }}
+            odoo_enterprise_repo_url=${{ matrix.odoo_enterprise_repo_url }}
+            odoo_enterprise_version=${{ matrix.odoo_enterprise_version }}
             odoo_org_repo=${{ matrix.odoo_org_repo }}
             setuptools_constraint=${{ matrix.setuptools_constraint }}
             odoo_config_setting=${{ matrix.odoo_config_setting }}
