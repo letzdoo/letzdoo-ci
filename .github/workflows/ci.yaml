@@ -106,6 +106,8 @@ jobs:
             odoo_org_repo=${{ matrix.odoo_org_repo }}
             setuptools_constraint=${{ matrix.setuptools_constraint }}
             odoo_config_setting=${{ matrix.odoo_config_setting }}
+            odoo_enterprise_repo_url=${{ matrix.odoo_enterprise_repo_url }}
+            odoo_enterprise_version=${{ matrix.odoo_enterprise_version }}
           tags: |
             ghcr.io/letzdoo/letzdoo-ci/${{ matrix.image_name }}:latest
           labels: |
