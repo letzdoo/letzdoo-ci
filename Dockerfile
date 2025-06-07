@@ -15,7 +15,8 @@ RUN apt-get update -qq \
         lsb-release \
         software-properties-common \
         expect-dev \
-        pipx
+        pipx \
+        openssh-client
 
 ENV PIPX_BIN_DIR=/usr/local/bin
 
