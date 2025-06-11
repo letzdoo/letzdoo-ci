@@ -42,9 +42,6 @@ mkdir -p "$HOME/.ssh"
 ssh-keyscan github.com >> "$HOME/.ssh/known_hosts"
 
 # Clone the Enterprise Repository
-export GIT_SSH_COMMAND="ssh -v"
-
-# Clone the Enterprise Repository
 if [ -d "${ENTERPRISE_DIR}" ]; then
     echo "Enterprise directory ${ENTERPRISE_DIR} already exists. Removing it for a clean clone."
     rm -rf "${ENTERPRISE_DIR}"
